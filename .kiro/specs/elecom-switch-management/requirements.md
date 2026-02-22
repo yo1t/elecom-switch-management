@@ -221,3 +221,18 @@
 4. THE Script SHALL セキュリティのベストプラクティスをドキュメントに記載する
 5. THE Script SHALL 複数スイッチ管理の例をドキュメントに記載する
 6. THE Script SHALL トラブルシューティングガイドをドキュメントに記載する
+
+### 要件18: 概要表示機能
+
+**ユーザーストーリー:** ネットワーク管理者として、スイッチの状態を素早く確認したい。そうすることで、詳細なJSON出力を解析する手間を省ける。
+
+#### 受入基準
+
+1. THE Script SHALL --summaryオプションを提供する
+2. WHEN --summaryオプションが指定される、THE Script SHALL スイッチの基本情報を表示する
+3. THE Script SHALL ポート状態（UP/DOWN、速度、デュプレックス）を表示する
+4. THE Script SHALL ポート稼働率を計算して表示する
+5. THE Script SHALL VLAN設定の一覧を表示する
+6. THE Script SHALL MACアドレステーブルの統計情報を表示する
+7. THE Script SHALL ポート別のMAC数を表示する
+8. THE Script SHALL 人間が読みやすい形式で出力する

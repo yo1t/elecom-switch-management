@@ -10,6 +10,9 @@
 python3 get_elecom_swhub_info.py --env-file .env.office-floor1 --mac --pretty
 python3 get_elecom_swhub_info.py --env-file .env.datacenter-rack1 --vlan --pretty
 
+# スイッチ情報の概要を表示（推奨）
+python3 get_elecom_swhub_info.py --env-file .env.office-floor1 --summary
+
 # 全ポート統計取得（GE1-GE8 + LAG1-LAG4）
 python3 get_elecom_swhub_info.py --env-file .env.office-floor1 --traffic --pretty
 
@@ -39,6 +42,7 @@ python3 disconnect_all_sessions.py --ip 192.168.1.1 --user username --password p
 - `--ip`: スイッチのIPアドレス（直接指定、非推奨）
 - `--user`: ユーザー名（直接指定、非推奨）
 - `--password`: パスワード（直接指定、非推奨）
+- `--summary`: スイッチ情報の概要を表示（推奨）
 - `--status`: ポートステータス
 - `--port`: ポート設定情報
 - `--vlan`: VLAN情報
@@ -134,6 +138,8 @@ python3 disconnect_all_sessions.py --ip 192.168.1.1 --user username --password p
 
 ## 使用上の注意事項
 
-- スイッチへの同時接続数に制限があります
+- スイッチへの同時接続数に制限があります（1セッションのみ）
+- ブラウザでスイッチにログインしている場合は、ログアウトしてからスクリプトを実行してください
 - 連続してアクセスする場合は、セッション切断後に数秒待機してください
 - 接続エラーが発生した場合は、`disconnect_all_sessions.py`でセッションをクリアしてください
+- `--summary`オプションで、スイッチの状態を素早く確認できます

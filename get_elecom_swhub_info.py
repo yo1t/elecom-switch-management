@@ -53,6 +53,99 @@ def get_config_value(arg_value, env_file_value):
         return arg_value
     return env_file_value
 
+def print_summary(result):
+    """スイッチ情報の概要を表示"""
+    print("=" * 70)
+    print("スイッチ情報概要")
+    print("=" * 70)
+    print()
+    
+    # 基本情報
+    if 'home_main' in result and 'data' in result['home_main']:
+        data = result['home_main']['data']
+        print(f"モデル: {data.get('title', 'N/A')}")
+        print(f"説明: {data.get('boardDescp', 'N/A')}")
+        print(f"ユーザー: {data.get('user', 'N/A')} (権限レベル: {data.get('priv', 'N/A')})")
+        print()
+    
+    # ポート状態
+    if 'panel_info' in result and 'data' in result['panel_info']:
+        ports = result['panel_info']['data'].get('ports', [])
+        print("ポート状態:")
+        print("-" * 70)
+        
+        total_ports = 0
+        active_ports = 0
+        
+        for i, port in enumerate(ports[:8], 1):  # 物理ポートのみ（GE1-8）
+            linkup = port.get('linkup', False)
+            speed = port.get('speed', 'N/A')
+            duplex = 'Full' if port.get('dupFull', False) else 'Half'
+            
+            status = "✅ UP" if linkup else "❌ DOWN"
+            speed_info = f"{int(speed)/1000:.1f}G {duplex}" if linkup and speed != 'N/A' else ""
+            
+            print(f"  GE{i}: {status:8} {speed_info}")
+            
+            total_ports += 1
+            if linkup:
+                active_ports += 1
+        
+        print()
+        print(f"稼働率: {active_ports}/{total_ports}ポート ({active_ports*100//total_ports}%)")
+        print()
+    
+    # VLAN情報
+    if 'vlan_conf' in result and 'data' in result['vlan_conf']:
+        vlans = result['vlan_conf']['data'].get('vlans', [])
+        print("VLAN設定:")
+        print("-" * 70)
+        
+        for vlan in vlans:
+            vlan_id = vlan.get('val', 'N/A')
+            vlan_name = vlan.get('name', 'N/A')
+            print(f"  VLAN {vlan_id} ({vlan_name})")
+        
+        print()
+    
+    # MACアドレステーブル
+    if 'mac_dynamic' in result and 'data' in result['mac_dynamic']:
+        entries = result['mac_dynamic']['data'].get('entries', [])
+        # 最初のエントリは空なのでスキップ
+        mac_count = len([e for e in entries if e.get('macAddr', '')])
+        aging_time = result['mac_dynamic']['data'].get('aging_time', 'N/A')
+        
+        print("MACアドレステーブル:")
+        print("-" * 70)
+        print(f"  学習済みMAC: {mac_count}エントリ")
+        print(f"  エージングタイム: {aging_time}秒")
+        
+        # ポート別のMAC数を集計
+        port_macs = {}
+        for entry in entries:
+            port = entry.get('port', '')
+            if port and port.startswith('GE'):
+                port_macs[port] = port_macs.get(port, 0) + 1
+        
+        if port_macs:
+            print(f"\n  ポート別MAC数:")
+            for port in sorted(port_macs.keys(), key=lambda x: int(x[2:])):
+                print(f"    {port}: {port_macs[port]}個")
+        
+        print()
+    
+    # トラフィック統計（簡易版）
+    if 'port_traffic_all' in result:
+        print("トラフィック統計:")
+        print("-" * 70)
+        print("  全ポート（GE1-8 + LAG1-4）の統計データを取得済み")
+        print()
+    
+    print("=" * 70)
+    print("詳細情報は --all --pretty オプションで確認できます")
+    print("=" * 70)
+
+
 # 取得可能な情報の定義
 AVAILABLE_COMMANDS = {
     'status': [('panel_info', 'ポートステータス')],
@@ -251,6 +344,7 @@ def main():
     parser.add_argument('--mac', action='store_true', help='MACアドレステーブルを取得')
     parser.add_argument('--traffic', action='store_true', help='全ポートのトラフィック統計を取得')
     parser.add_argument('--main', action='store_true', help='スイッチ基本情報を取得')
+    parser.add_argument('--summary', action='store_true', help='スイッチ情報の概要を表示')
     parser.add_argument('--pretty', action='store_true', help='整形されたJSON出力')
     
     args = parser.parse_args()
@@ -290,15 +384,25 @@ def main():
             get_all_port_traffic = True
     
     # コマンドが指定されていない場合はヘルプを表示
-    if not commands_to_fetch and not get_all_port_traffic:
+    if not commands_to_fetch and not get_all_port_traffic and not args.summary:
         parser.print_help()
         return
+    
+    # summaryオプションの場合は、必要な情報を自動的に取得
+    if args.summary:
+        commands_to_fetch.extend([cmd for cmd, _ in AVAILABLE_COMMANDS['status']])
+        commands_to_fetch.extend([cmd for cmd, _ in AVAILABLE_COMMANDS['vlan']])
+        commands_to_fetch.extend([cmd for cmd, _ in AVAILABLE_COMMANDS['mac']])
+        commands_to_fetch.extend([cmd for cmd, _ in AVAILABLE_COMMANDS['main']])
+        get_all_port_traffic = True
     
     # データ取得
     result = get_switch_data(switch_url, switch_user, switch_password, commands_to_fetch, get_all_port_traffic)
     
-    # JSON出力
-    if args.pretty:
+    # 出力
+    if args.summary:
+        print_summary(result)
+    elif args.pretty:
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
         print(json.dumps(result, ensure_ascii=False))
