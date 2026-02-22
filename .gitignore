@@ -1,0 +1,22 @@
+# 環境変数ファイル
+.env
+.env.*
+# .env.exampleは例示用なのでコミット可能
+!.env.example
+
+# JSONデータファイル
+*.json
+
+# Pythonキャッシュ
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# テストファイル
+test_*.json
+output_*.json
+
+# 古いスクリプト
+old_scripts/
