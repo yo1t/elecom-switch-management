@@ -236,3 +236,33 @@
 6. THE Script SHALL MACアドレステーブルの統計情報を表示する
 7. THE Script SHALL ポート別のMAC数を表示する
 8. THE Script SHALL 人間が読みやすい形式で出力する
+
+### 要件19: 自動セッション管理とリトライ
+
+**ユーザーストーリー:** ネットワーク管理者として、セッション管理を気にせずにスクリプトを実行したい。そうすることで、手動でセッションを切断する手間を省ける。
+
+#### 受入基準
+
+1. THE Script SHALL 実行前に既存セッションを自動的に切断する
+2. THE Script SHALL データ取得後に自動的にログアウトする
+3. THE Script SHALL ログアウト後にセッション解放を待つ（3秒）
+4. WHEN セッション競合が検出される、THE Script SHALL 自動的にリトライする
+5. THE Script SHALL 最大2回まで試行する（1回目は失敗を想定）
+6. THE Script SHALL リトライ間隔を3秒に設定する
+7. THE Script SHALL 1回目の失敗時はエラーメッセージを表示しない
+8. THE Script SHALL ユーザーに透過的に動作する
+9. THE Script SHALL 例外が発生した場合でもfinallyブロックでログアウトを保証する
+
+### 要件20: フォーム認証の実装
+
+**ユーザーストーリー:** 開発者として、スイッチの正しい認証方式を実装したい。そうすることで、確実にログインできる。
+
+#### 受入基準
+
+1. THE Script SHALL Backbone.js形式のJSON Payloadを使用する
+2. THE Script SHALL POSTリクエストで`home_loginAuth`エンドポイントを呼び出す
+3. THE Script SHALL `_ds=1`および`_de=1`パラメータを含める
+4. THE Script SHALL Content-Typeを`application/json`に設定する
+5. THE Script SHALL ログインステータスを`home_loginStatus`で確認する
+6. THE Script SHALL ログイン成功後にデータ取得を開始する
+7. THE Script SHALL Basic認証ヘッダーをPOSTリクエストに含めない

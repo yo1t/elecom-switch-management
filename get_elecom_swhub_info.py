@@ -31,6 +31,7 @@ import json
 import time
 import argparse
 import os
+import sys
 
 # ポート一覧（物理ポート + LAG）
 PORTS = ["GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "GE7", "GE8", "LAG1", "LAG2", "LAG3", "LAG4"]
@@ -155,6 +156,59 @@ AVAILABLE_COMMANDS = {
     'main': [('home_main', 'スイッチ基本情報')],
 }
 
+def get_switch_data_with_retry(switch_url, username, password, commands_to_fetch, get_all_port_traffic=False, max_retries=2, retry_delay=3):
+    """リトライ機能付きでスイッチにログインして指定された情報を取得
+    
+    注意: スイッチは前回のセッションを完全に解放するまでに時間がかかるため、
+    1回目は失敗することが多い。そのため、デフォルトで2回試行する。
+    """
+    
+    # 最初の試行前に既存セッションを切断
+    try:
+        disconnect_existing_session(switch_url)
+        time.sleep(1)
+    except:
+        pass
+    
+    for attempt in range(max_retries):
+        try:
+            result = get_switch_data(switch_url, username, password, commands_to_fetch, get_all_port_traffic)
+            
+            # エラーがある場合はリトライ
+            if "error" in result:
+                error_msg = result.get("error", "")
+                # 400エラー（セッション競合）の場合はリトライ
+                if "400" in str(error_msg) or "Bad Request" in str(error_msg):
+                    if attempt < max_retries - 1:
+                        # 1回目の失敗は想定内なので、メッセージを表示しない
+                        time.sleep(retry_delay)
+                        continue
+                # その他のエラーはそのまま返す
+                return result
+            
+            # 成功した場合は結果を返す
+            return result
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                # 1回目の失敗は想定内なので、メッセージを表示しない
+                time.sleep(retry_delay)
+            else:
+                return {"error": str(e)}
+    
+    return {"error": "最大リトライ回数に達しました"}
+
+def disconnect_existing_session(switch_url):
+    """既存のセッションを切断"""
+    try:
+        request = urllib.request.Request(f"{switch_url}/login.html?reason=logout")
+        request.add_header('User-Agent', 'Mozilla/5.0')
+        
+        with urllib.request.urlopen(request, timeout=3) as response:
+            pass
+    except:
+        pass
+
 def get_switch_data(switch_url, username, password, commands_to_fetch, get_all_port_traffic=False):
     """スイッチにログインして指定された情報を取得"""
     
@@ -213,18 +267,46 @@ def get_switch_data(switch_url, username, password, commands_to_fetch, get_all_p
         
         time.sleep(0.3)
         
-        # ステップ4: home.htmlにアクセス
-        request = urllib.request.Request(f"{switch_url}/home.html")
-        for key, value in headers.items():
-            request.add_header(key, value)
+        # ステップ4: ログイン認証を送信（Backbone.js形式）
+        login_auth_url = f"{switch_url}/cgi/set.cgi?cmd=home_loginAuth&dummy={int(time.time() * 1000)}"
+        
+        # Backbone.jsが使用する特殊な形式
+        form_data = f"_ds=1&username={username}&password={password}&optLanguage=1&_de=1"
+        login_data_dict = {form_data: {}}
+        login_data = json.dumps(login_data_dict).encode('utf-8')
+        
+        request = urllib.request.Request(login_auth_url, data=login_data, method='POST')
+        request.add_header('User-Agent', headers['User-Agent'])
+        request.add_header('Accept', 'application/json, text/javascript, */*; q=0.01')
+        request.add_header('Accept-Language', headers['Accept-Language'])
+        request.add_header('Connection', headers['Connection'])
+        request.add_header('Content-Type', 'application/json')
+        request.add_header('Origin', switch_url)
         request.add_header('Referer', f"{switch_url}/login.html")
+        request.add_header('X-Requested-With', 'XMLHttpRequest')
+        # Basic認証ヘッダーは送信しない
         
         with opener.open(request, timeout=10) as response:
-            pass
+            auth_response = response.read().decode('utf-8', errors='ignore')
         
         time.sleep(0.5)
         
-        # ステップ5: 指定された情報を取得
+        # ステップ5: ログインステータスを確認
+        status_url = f"{switch_url}/cgi/get.cgi?cmd=home_loginStatus&dummy={int(time.time() * 1000)}"
+        
+        request = urllib.request.Request(status_url)
+        for key, value in headers.items():
+            request.add_header(key, value)
+        request.add_header('Referer', f"{switch_url}/login.html")
+        request.add_header('Accept', 'application/json, text/javascript, */*; q=0.01')
+        request.add_header('X-Requested-With', 'XMLHttpRequest')
+        
+        with opener.open(request, timeout=10) as response:
+            status_response = response.read().decode('utf-8', errors='ignore')
+        
+        time.sleep(0.3)
+        
+        # ステップ6: 指定された情報を取得
         for cmd in commands_to_fetch:
             api_url = f"{switch_url}/cgi/get.cgi?cmd={cmd}&dummy={int(time.time() * 1000)}"
             
@@ -280,20 +362,23 @@ def get_switch_data(switch_url, username, password, commands_to_fetch, get_all_p
                 except Exception as e:
                     result['port_traffic_all'][port] = {"error": str(e)}
         
-        # ステップ6: ログアウト
-        request = urllib.request.Request(f"{switch_url}/login.html?reason=logout")
-        for key, value in headers.items():
-            request.add_header(key, value)
-        request.add_header('Referer', f"{switch_url}/home.html")
-        
-        try:
-            with opener.open(request, timeout=5) as response:
-                pass
-        except:
-            pass
-        
     except Exception as e:
         result["error"] = str(e)
+    finally:
+        # 必ずログアウトしてセッションを切断
+        try:
+            logout_request = urllib.request.Request(f"{switch_url}/login.html?reason=logout")
+            logout_request.add_header('User-Agent', headers.get('User-Agent', 'Mozilla/5.0'))
+            logout_request.add_header('Referer', f"{switch_url}/home.html")
+            
+            with opener.open(logout_request, timeout=5) as response:
+                pass
+            
+            # スイッチがセッションを完全に解放するまで待つ
+            time.sleep(3)
+        except:
+            # ログアウトに失敗しても処理を続行
+            pass
     
     return result
 
@@ -396,8 +481,8 @@ def main():
         commands_to_fetch.extend([cmd for cmd, _ in AVAILABLE_COMMANDS['main']])
         get_all_port_traffic = True
     
-    # データ取得
-    result = get_switch_data(switch_url, switch_user, switch_password, commands_to_fetch, get_all_port_traffic)
+    # データ取得（リトライ機能付き）
+    result = get_switch_data_with_retry(switch_url, switch_user, switch_password, commands_to_fetch, get_all_port_traffic)
     
     # 出力
     if args.summary:
