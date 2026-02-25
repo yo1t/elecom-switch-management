@@ -244,14 +244,15 @@
 #### 受入基準
 
 1. THE Script SHALL 実行前に既存セッションを自動的に切断する
-2. THE Script SHALL データ取得後に自動的にログアウトする
-3. THE Script SHALL ログアウト後にセッション解放を待つ（3秒）
-4. WHEN セッション競合が検出される、THE Script SHALL 自動的にリトライする
-5. THE Script SHALL 最大2回まで試行する（1回目は失敗を想定）
-6. THE Script SHALL リトライ間隔を3秒に設定する
-7. THE Script SHALL 1回目の失敗時はエラーメッセージを表示しない
-8. THE Script SHALL ユーザーに透過的に動作する
-9. THE Script SHALL 例外が発生した場合でもfinallyブロックでログアウトを保証する
+2. THE Script SHALL 実行前のセッション切断後に短い待機時間（0.5秒）を設定する
+3. THE Script SHALL データ取得後に自動的にログアウトする
+4. THE Script SHALL ログアウト後にセッション解放を待つ（1秒）
+5. WHEN セッション競合が検出される、THE Script SHALL 自動的にリトライする
+6. THE Script SHALL 最大2回まで試行する（1回目は失敗を想定）
+7. THE Script SHALL 指数バックオフでリトライ間隔を調整する（1秒 → 2秒 → 4秒）
+8. THE Script SHALL 1回目の失敗時はエラーメッセージを表示しない
+9. THE Script SHALL ユーザーに透過的に動作する
+10. THE Script SHALL 例外が発生した場合でもfinallyブロックでログアウトを保証する
 
 ### 要件20: フォーム認証の実装
 
