@@ -156,17 +156,22 @@ AVAILABLE_COMMANDS = {
     'main': [('home_main', 'スイッチ基本情報')],
 }
 
-def get_switch_data_with_retry(switch_url, username, password, commands_to_fetch, get_all_port_traffic=False, max_retries=2, retry_delay=3):
+def get_switch_data_with_retry(switch_url, username, password, commands_to_fetch, get_all_port_traffic=False, max_retries=2, initial_retry_delay=1):
     """リトライ機能付きでスイッチにログインして指定された情報を取得
     
     注意: スイッチは前回のセッションを完全に解放するまでに時間がかかるため、
     1回目は失敗することが多い。そのため、デフォルトで2回試行する。
+    
+    指数バックオフを使用してリトライ間隔を調整：
+    - 1回目の失敗: 1秒待機
+    - 2回目の失敗: 2秒待機
+    - 3回目の失敗: 4秒待機
     """
     
     # 最初の試行前に既存セッションを切断
     try:
         disconnect_existing_session(switch_url)
-        time.sleep(1)
+        time.sleep(0.5)  # 短い待機時間に変更
     except:
         pass
     
@@ -180,8 +185,10 @@ def get_switch_data_with_retry(switch_url, username, password, commands_to_fetch
                 # 400エラー（セッション競合）の場合はリトライ
                 if "400" in str(error_msg) or "Bad Request" in str(error_msg):
                     if attempt < max_retries - 1:
+                        # 指数バックオフ: 1秒 → 2秒 → 4秒
+                        wait_time = initial_retry_delay * (2 ** attempt)
                         # 1回目の失敗は想定内なので、メッセージを表示しない
-                        time.sleep(retry_delay)
+                        time.sleep(wait_time)
                         continue
                 # その他のエラーはそのまま返す
                 return result
@@ -191,8 +198,10 @@ def get_switch_data_with_retry(switch_url, username, password, commands_to_fetch
             
         except Exception as e:
             if attempt < max_retries - 1:
+                # 指数バックオフ: 1秒 → 2秒 → 4秒
+                wait_time = initial_retry_delay * (2 ** attempt)
                 # 1回目の失敗は想定内なので、メッセージを表示しない
-                time.sleep(retry_delay)
+                time.sleep(wait_time)
             else:
                 return {"error": str(e)}
     
@@ -375,7 +384,8 @@ def get_switch_data(switch_url, username, password, commands_to_fetch, get_all_p
                 pass
             
             # スイッチがセッションを完全に解放するまで待つ
-            time.sleep(3)
+            # 指数バックオフのリトライがあるため、待機時間を短縮
+            time.sleep(1)
         except:
             # ログアウトに失敗しても処理を続行
             pass
