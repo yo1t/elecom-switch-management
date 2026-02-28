@@ -1,5 +1,13 @@
 # ELECOM EHB-SQ2A08 Switch Management Scripts
 
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yo1t/elecom-switch-management)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/yo1t/elecom-switch-management/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.x-blue.svg)](https://www.python.org/)
+
+> **Repository**: [https://github.com/yo1t/elecom-switch-management](https://github.com/yo1t/elecom-switch-management)
+
+Python scripts for managing ELECOM EHB-SQ2A08 switching hub. Retrieve port status, VLAN, MAC table, and traffic statistics with automatic session management and retry functionality.
+
 ## Script List
 
 ### 1. get_elecom_swhub_info.py
